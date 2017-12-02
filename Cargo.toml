@@ -1,0 +1,10 @@
+[package]
+name = "mandelbrot"
+version = "0.1.0"
+authors = ["linfeng.yuan <cxwcylf@126.com>"]
+
+[dependencies]
+num = "*"
+image = "*"
+crossbeam = "*"
+num_cpus = "*"
