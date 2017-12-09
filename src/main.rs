@@ -2,6 +2,7 @@ extern crate num;
 extern crate image;
 extern crate num_cpus;
 extern crate crossbeam;
+extern crate rayon;
 
 use std::io::Write;
 use num::Complex;
@@ -9,6 +10,7 @@ use std::str::FromStr;
 use image::ColorType;
 use image::png::PNGEncoder;
 use std::fs::File;
+use rayon::prelude::*;
 
 
 #[allow(dead_code)]
@@ -172,7 +174,7 @@ fn write_image(
     Ok(())
 }
 
-fn do_parallel_render(
+fn do_parallel_render_crossbeam(
     pixels: &mut Vec<u8>,
     bounds: (usize, usize),
     upper_left: Complex<f64>,
@@ -181,7 +183,9 @@ fn do_parallel_render(
     let threads = num_cpus::get();
     let rows_per_band = bounds.1 / threads + 1;
 
-    let bands: Vec<&mut [u8]> = pixels.chunks_mut(rows_per_band * bounds.0 ).collect();
+    let bands: Vec<&mut [u8]> = pixels
+        .chunks_mut(rows_per_band * bounds.0)
+        .collect();
     crossbeam::scope(|spawner| for (i, band) in bands.into_iter().enumerate() {
         let top = rows_per_band * i;
         let height = band.len() / bounds.0 ;
@@ -193,6 +197,35 @@ fn do_parallel_render(
             render(band, band_bounds, band_upper_left, band_lower_right)
         });
     });
+}
+
+fn do_parallel_render_rayon(
+    pixels: &mut Vec<u8>,
+    bounds: (usize, usize),
+    upper_left: Complex<f64>,
+    lower_right: Complex<f64>,
+) {
+    let threads = num_cpus::get();
+    let rows_per_band = bounds.1 / threads + 1;
+
+    let bands: Vec<(usize, &mut [u8])> = pixels
+        .chunks_mut(bounds.0)
+        .enumerate()
+        .collect();
+    bands.into_par_iter()
+        .for_each(|(i, band)|{
+            let top = i;
+            let band_bounds = (bounds.0, 1);
+            let band_upper_left = pixel2point(bounds,
+                                                 (0, top),
+                                                 upper_left,
+                                                 lower_right);
+            let band_lower_right = pixel2point(bounds,
+                                                 (bounds.0, top + 1),
+                                                 upper_left,
+                                                 lower_right);
+            render(band, band_bounds, band_upper_left, band_lower_right);
+        });
 }
 
 fn main() {
@@ -215,7 +248,7 @@ fn main() {
     let lower_right = parse_complex(&args[4]).expect("error parsing right corner point");
     let mut pixels = vec![0; bounds.0 * bounds.1];
     //    render(&mut pixels, bounds, upper_left, lower_right);
-    //    write_image(&args[1], &pixels, bounds).expect("error write PNG file");
-    do_parallel_render(&mut pixels, bounds, upper_left, lower_right);
+//    do_parallel_render_crossbeam(&mut pixels, bounds, upper_left, lower_right);
+    do_parallel_render_rayon(&mut pixels, bounds, upper_left, lower_right);
     write_image(&args[1], &pixels, bounds).expect("error writing PNG file");
 }
