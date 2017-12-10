@@ -37,32 +37,32 @@ Use the setting:
 -b=-1.20,0.35 -e=-1,0.20
 ```
 Will get:
-a.png
+[](https://github.com/DogLi/mandelbrot/blob/master/img/a.png)
 
 Use the setting:
 ```
 -b=-2.5,-1.2 -e=1,1.2
 ```
 Will get:
-b.png
+[](https://github.com/DogLi/mandelbrot/blob/master/img/b.png)
 
 ```
 -b=-0.090,0.654 -e=-0.086,0.657
 ```
 Will get:
-c.png
+[](https://github.com/DogLi/mandelbrot/blob/master/img/c.png)
 
 ```
 -b=-0.750,0.099 -e=-0.747,0.102
 ```
 Will get:
-d.png
+[](https://github.com/DogLi/mandelbrot/blob/master/img/d.png)
 
 ```
 -b=0.275,0.006 -e=0.28,0.01
 ```
 Will get:
-e.png
+[](https://github.com/DogLi/mandelbrot/blob/master/img/e.png)
 
 Try more settings by yourself!
 
