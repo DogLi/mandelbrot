@@ -7,3 +7,4 @@ authors = ["linfeng.yuan <cxwcylf@126.com>"]
 num = "*"
 image = "*"
 rayon = "*"
+clap = "*"

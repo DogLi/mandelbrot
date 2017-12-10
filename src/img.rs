@@ -1,5 +1,4 @@
 use std::path::Path;
-use std::io;
 use image::{Rgb, ImageBuffer};
 use super::color;
 
@@ -20,13 +19,20 @@ impl <'a> Picture<'a> {
         }
     }
 
-    fn fill_color(&mut self, pixels: &[Rgb<u8>]) -> io::Result<()> {
+    fn fill_color(&mut self, pixels: &[Rgb<u8>]){
         for (index, p) in self.buffer.pixels_mut().enumerate() {
             let color = pixels[index];
             *p = color;
         }
         let path = Path::new(self.path_name);
-        self.buffer.save(path)
+        match self.buffer.save(path) {
+            Ok(()) => {
+                println!("create {:?} success!", path);
+            },
+            Err(e) => {
+                println!("create {:?} failed: {:?}!", path, e);
+            }
+        }
     }
 }
 
@@ -35,7 +41,7 @@ impl <'a> Picture<'a> {
 /// Write the buffer `pixels`, whose dimensions are given by `bounds`,
 /// to the file named `filename`.
 ///
-pub fn write_image(filename: &str, pixels: &[Rgb<u8>], bounds: (usize, usize)) -> io::Result<()> {
+pub fn write_image(filename: &str, pixels: &[Rgb<u8>], bounds: (usize, usize)){
     let mut pic = Picture::new(bounds.0, bounds.1, filename);
-    pic.fill_color(pixels)
+    pic.fill_color(pixels);
 }
