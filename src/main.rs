@@ -1,7 +1,5 @@
 extern crate num;
 extern crate image;
-extern crate num_cpus;
-extern crate crossbeam;
 extern crate rayon;
 
 use std::io;
@@ -9,15 +7,13 @@ use std::path::Path;
 use std::io::Write;
 use num::Complex;
 use std::str::FromStr;
-use image::{Rgb, Pixel, ImageBuffer};
-use image::png::PNGEncoder;
-use std::fs::File;
+use image::{Rgb, ImageBuffer};
 use rayon::prelude::*;
 
-
 const R: f64 = 4.0;
-const ITER_NUM: u32 = 200;
+const ITER_NUM: u32 = 500;
 const COLOR_LEN: usize = 3;
+const BLACK_COLOR: Rgb<u8> = Rgb{data: [0 as u8; COLOR_LEN]};
 
 pub struct Picture<'a> {
     buffer: ImageBuffer<Rgb<u8>, Vec<u8>>,
@@ -64,42 +60,44 @@ fn complex_squre_add_loop(c: Complex<f64>) {
 /// return `None`.
 
 
-fn escape_time(c: Complex<f64>, limit: u32) -> Option<u32> {
+fn escape_time(c: Complex<f64>) -> (Complex<f64>, Option<u32>) {
     let mut z = Complex { re: 0.0, im: 0.0 };
-    for i in 0..limit {
+    for i in 0..ITER_NUM {
         z = z * z + c;
-        if z.norm_sqr() > R {
-            return Some(i);
+        if z.norm_sqr().sqrt() >= R {
+            return (z, Some(i));
         }
     }
-    None
+    (z, None)
 }
 
 /// get rgb color
 /// From: https://www.reddit.com/r/math/comments/2abwyt/smooth_colour_mandelbrot/
 
-fn color_rgb(z: Complex<f64>, i: Option<u32>)->Rgb<u8>
+fn get_color_rgb(z: Complex<f64>, count: Option<u32>)->Rgb<u8>
 {
-    let data = match i {
+    let data: [f64; COLOR_LEN] = match count {
         None => {
-            [0 as u8, 0 as u8 , 0 as u8]
+            [0.0; 3]
         },
         Some(i) => {
-            // log2(i + R - np.log2(np.log2(abs(z)))) / 5
-            let mut v = (i as f64 + R- z.norm_sqr().log2().log2()).log2() / 5.0;
-
+            let mut v = (i as f64 + R - z.norm_sqr().sqrt().log2().log2()).log2() / 5.0;
             if v < 1.0 {
                 // v**4, v**2.5, v
-                [(v.powi(4) * 255.0) as u8, (v.powf(2.5) * 255.0) as u8, (v * 255.0) as u8]
+                [v.powi(4), v.powf(2.5), v]
             } else {
                 // v = max(0, 2 - v); v, v**1.5, v**3
                 v = (2.0 - v).max(0.0);
-                [(v * 255.0) as u8, (v.powf(1.5) * 255.0) as u8, (v.powi(3) * 255.0) as u8]
-
+                [v, v.powf(1.5), v.powf(3.0)]
             }
         }
     };
-    Rgb{data: data}
+
+    let mut color_data = [0 as u8; 3];
+    for (i, item) in data.iter().enumerate() {
+        color_data[i] = (item * 255.0) as u8;
+    }
+    Rgb{data: color_data}
 }
 
 /// Parse the string `s` as a coordinate pair, like `"400x600"` or `1.0, 0.5`
@@ -146,13 +144,9 @@ fn pixel2point(
     begin_complex: Complex<f64>,
     end_complex: Complex<f64>,
 ) -> Complex<f64> {
-    let (width, height) = (
-        end_complex.re - begin_complex.re,
-        end_complex.im - begin_complex.im,
-    );
     Complex {
-        re: begin_complex.re + pixel.0 as f64 * width / bounds.0 as f64,
-        im: begin_complex.im + pixel.1 as f64 * height / bounds.1 as f64,
+        re: begin_complex.re + (end_complex.re - begin_complex.re) * pixel.0 as f64 / bounds.0 as f64,
+        im: begin_complex.im + (end_complex.im - begin_complex.im) * pixel.1 as f64 / bounds.1 as f64,
     }
 }
 
@@ -174,8 +168,8 @@ fn render(
     for row in 0..bounds.1 {
         for column in 0..bounds.0 {
             let point = pixel2point(bounds, (column, row), upper_left, lower_right);
-            let count = escape_time(point, ITER_NUM);
-            pixels[row * bounds.0 + column] = color_rgb(point, count);
+            let (z, count) = escape_time(point);
+            pixels[row * bounds.0 + column] = get_color_rgb(z, count);
         }
     }
 }
@@ -190,38 +184,12 @@ fn write_image(filename: &str, pixels: &[Rgb<u8>], bounds: (usize, usize)) -> io
     pic.fill_color(pixels)
 }
 
-fn do_parallel_render_crossbeam(
-    pixels: &mut Vec<Rgb<u8>>,
-    bounds: (usize, usize),
-    upper_left: Complex<f64>,
-    lower_right: Complex<f64>,
-) {
-    let threads = num_cpus::get();
-    let rows_per_band = bounds.1 / threads + 1;
-
-    let bands: Vec<&mut [Rgb<u8>]> = pixels.chunks_mut(rows_per_band * bounds.0).collect();
-    crossbeam::scope(|spawner| for (i, band) in bands.into_iter().enumerate() {
-        let top = rows_per_band * i;
-        let height = band.len() / bounds.0;
-        let band_bounds = (bounds.0, height);
-        let band_upper_left = pixel2point(bounds, (0, top), upper_left, lower_right);
-        let band_lower_right =
-            pixel2point(bounds, (bounds.0, top + height), upper_left, lower_right);
-        spawner.spawn(move || {
-            render(band, band_bounds, band_upper_left, band_lower_right)
-        });
-    });
-}
-
 fn do_parallel_render_rayon(
     pixels: &mut Vec<Rgb<u8>>,
     bounds: (usize, usize),
     upper_left: Complex<f64>,
     lower_right: Complex<f64>,
 ) {
-    let threads = num_cpus::get();
-    let rows_per_band = bounds.1 / threads + 1;
-
     let bands: Vec<(usize, &mut [Rgb<u8>])> = pixels.chunks_mut(bounds.0).enumerate().collect();
     bands.into_par_iter().for_each(|(i, band)| {
         let top = i;
@@ -237,12 +205,17 @@ fn main() {
     if args.len() != 5 {
         writeln!(
             std::io::stderr(),
-            "Usage: mandelbrot FILE PIXELS UPPERLEFT LOWERRIGHT"
+            "Usage: mandelbrot FILE PIXELS STARTPOINT ENDPOINT"
         ).unwrap();
         writeln!(
             std::io::stderr(),
-            "Example: {} mandel.png 1000x750 -1.20,0.35 -1,0.20",
-//            "Example: {} mandel.png 1000x750 -2.5,-1.2 1,1.20",
+            r#"Example: {} mandel.png 1200x960 -1.20,0.35 -1,0.20 and you can try the point:
+         -2.5,-1.2 1,1.2
+         0.275,0.006 0.28,0.01
+         -0.090,0.654 -0.086,0.657
+         -0.750,0.099 -0.747,0.102
+         "#,
+//            "Example: {} mandel.png 1200x960 -2.5,-1.2 1,1.20",
 
             args[0]
         ).unwrap();
@@ -252,10 +225,10 @@ fn main() {
     let bounds = parse_pair::<usize>(&args[2], 'x').expect("error parsing image dimensions");
     let upper_left = parse_complex(&args[3]).expect("error parsing left corner point");
     let lower_right = parse_complex(&args[4]).expect("error parsing right corner point");
-    let mut pixels = vec![Rgb{data: [0 as u8; 3]}; bounds.0 * bounds.1];
-        render(&mut pixels, bounds, upper_left, lower_right);
+    let mut pixels = vec![BLACK_COLOR; bounds.0 * bounds.1];
+//    render(&mut pixels, bounds, upper_left, lower_right);
     //    do_parallel_render_crossbeam(&mut pixels, bounds, upper_left, lower_right);
-//    do_parallel_render_rayon(&mut pixels, bounds, upper_left, lower_right);
+    do_parallel_render_rayon(&mut pixels, bounds, upper_left, lower_right);
     write_image(&args[1], &pixels, bounds).expect("error writing PNG file");
 }
 
@@ -266,10 +239,11 @@ mod tests {
     use num::Complex;
     #[test]
     fn test_color() {
-        let c = Complex { re: -1.20, im: 0.35};
-        let count = escape_time(c, ITER_NUM);
-        println!("{:?}", count);
-        assert!(true);
+        let point = Complex { re: -2.5, im: 1.2};
+        let (z, count) = escape_time(point);
+        assert_eq!(count, Some(1));
+        let rgb = get_color_rgb(z, count);
+        assert_eq!(rgb.data, [5, 22, 96]);
     }
 
     #[test]

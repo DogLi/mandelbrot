@@ -6,6 +6,4 @@ authors = ["linfeng.yuan <cxwcylf@126.com>"]
 [dependencies]
 num = "*"
 image = "*"
-crossbeam = "*"
-num_cpus = "*"
 rayon = "*"
