@@ -1,8 +1,10 @@
+[![LICENSE](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+![Build status](https://travis-ci.org/DogLi/mandelbrot.svg?branch=master)
 # Mandelbrot Set
 Use pure Rust to generate beautiful Mandelbrot Set.
 
 ## Requirements:
-- Rust >= 1.22
+- Rust >= 1.22 nightly
 - num
 - image
 - rayon
