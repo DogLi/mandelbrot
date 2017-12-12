@@ -4,3 +4,17 @@ rust:
 script:
   - cargo test --all
   - cargo run -- -b=-1.20,0.35 -e=-1,0.20 -f a.png
+
+after_success: |
+  sudo apt-get install libcurl4-openssl-dev libelf-dev libdw-dev &&
+  wget https://github.com/SimonKagstrom/kcov/archive/master.tar.gz &&
+  tar xzf master.tar.gz &&
+  cd kcov-master &&
+  mkdir build &&
+  cd build &&
+  cmake .. &&
+  make &&
+  sudo make install &&
+  cd ../.. &&
+  kcov --coveralls-id=$TRAVIS_JOB_ID --exclude-pattern=/.cargo,/usr/lib --verify target/cov target/debug/mandelbrot-* &&
+  bash <(curl -s https://codecov.io/bash) &&
