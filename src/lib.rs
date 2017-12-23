@@ -9,9 +9,21 @@ pub mod parser;
 pub mod render;
 
 use num::Complex;
+use img::Picture;
+use image::Rgb;
 
-pub fn run(bounds: (usize, usize), begin_point: Complex<f64>, end_point: Complex<f64>, file: &str){
+
+
+/// Write the buffer `pixels`, whose dimensions are given by `bounds`,
+/// to the file named `filename`.
+///
+pub fn write_image(filename: &str, pixels: &[Rgb<u8>], bounds: (usize, usize)) {
+    let mut pic = Picture::new(bounds.0, bounds.1, filename);
+    pic.fill_color(pixels);
+}
+
+pub fn run(bounds: (usize, usize), begin_point: Complex<f64>, end_point: Complex<f64>, file: &str) {
     let mut pixels = vec![color::BLACK_COLOR; bounds.0 * bounds.1];
     render::do_parallel_render(&mut pixels, bounds, begin_point, end_point);
-    img::write_image(file, &pixels, bounds);
+    write_image(file, &pixels, bounds);
 }

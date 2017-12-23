@@ -46,7 +46,9 @@ pub fn pixel2point(
     end_complex: Complex<f64>,
 ) -> Complex<f64> {
     Complex {
-        re: begin_complex.re + (end_complex.re - begin_complex.re) * pixel.0 as f64 / bounds.0 as f64,
-        im: begin_complex.im + (end_complex.im - begin_complex.im) * pixel.1 as f64 / bounds.1 as f64,
+        re: begin_complex.re +
+            (end_complex.re - begin_complex.re) * pixel.0 as f64 / bounds.0 as f64,
+        im: begin_complex.im +
+            (end_complex.im - begin_complex.im) * pixel.1 as f64 / bounds.1 as f64,
     }
 }

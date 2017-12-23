@@ -37,7 +37,8 @@ pub fn do_parallel_render(
         let top = i;
         let band_bounds = (bounds.0, 1);
         let band_upper_left = parser::pixel2point(bounds, (0, top), upper_left, lower_right);
-        let band_lower_right = parser::pixel2point(bounds, (bounds.0, top + 1), upper_left, lower_right);
+        let band_lower_right =
+            parser::pixel2point(bounds, (bounds.0, top + 1), upper_left, lower_right);
         render(band, band_bounds, band_upper_left, band_lower_right);
     });
 }
